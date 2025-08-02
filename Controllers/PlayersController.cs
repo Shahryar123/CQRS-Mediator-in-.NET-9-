@@ -2,6 +2,9 @@
 using CQRS_and_Mediator.Entities;
 using CQRS_and_Mediator.Data;
 using Microsoft.EntityFrameworkCore;
+using CQRS_and_Mediator.Features.Player.CreatePlayer;
+using MediatR;
+using CQRS_and_Mediator.Features.Player.GetPlayerById;
 
 namespace CQRS_and_Mediator.Controllers
 {
@@ -9,11 +12,12 @@ namespace CQRS_and_Mediator.Controllers
     [Route("api/[controller]")]
     public class PlayersController : ControllerBase
     {
-        VideoGameAppDBContext _context;
-
-        public PlayersController(VideoGameAppDBContext context)
+        private readonly VideoGameAppDBContext _context;
+        private readonly ISender _sender;
+        public PlayersController(VideoGameAppDBContext context, ISender sender)
         {
             _context = context;
+            _sender = sender;
         }   
         // GET: api/Players
         [HttpGet]
@@ -24,21 +28,20 @@ namespace CQRS_and_Mediator.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<Player>> Create(Player player)
+        public async Task<ActionResult<Player>> Create(CreatePlayerCommand player)
         {
             if (player == null)
             {
                 return BadRequest("Player cannot be null");
             }
-            _context.Players.Add(player);
-            await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetAll), new { id = player.Id }, player);
+            var playerId = await _sender.Send(player);
+            return CreatedAtAction(nameof(GetAll), new { id = playerId }, player);
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<Player>> GetById(int id)
+        public async Task<IActionResult> GetById(int id)
         {
-            var player = await _context.Players.FindAsync(id);
+            var player = await _sender.Send(new GetPlayerByIdQuery(id) );
             if (player == null)
             {
                 return NotFound($"Player with ID {id} not found");
